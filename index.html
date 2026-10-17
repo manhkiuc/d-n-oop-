@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quản lý Hợp đồng Bảo hiểm Nhân thọ</title>
+<style>
+  :root{--bg:#f4f6f9;--card:#fff;--tx:#1b2430;--mut:#667085;--pri:#0b6e4f;--prit:#fff;--bd:#dfe4ec;--err:#c0392b}
+  @media (prefers-color-scheme:dark){:root{--bg:#10151c;--card:#18202b;--tx:#e8edf3;--mut:#93a0b3;--pri:#3ecf9a;--prit:#08140f;--bd:#2a3442;--err:#ff7b6b}}
+  *{box-sizing:border-box} body{margin:0;font:15px/1.5 system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--tx);display:flex;min-height:100vh}
+  nav{width:230px;background:var(--card);border-right:1px solid var(--bd);padding:16px 10px;position:sticky;top:0;height:100vh;overflow:auto}
+  nav h1{font-size:15px;margin:0 8px 14px;line-height:1.3}
+  nav button{display:block;width:100%;text-align:left;background:none;border:0;color:var(--tx);padding:8px 10px;border-radius:8px;cursor:pointer;font:inherit}
+  nav button:hover{background:var(--bg)} nav button.on{background:var(--pri);color:var(--prit)}
+  nav .sep{font-size:12px;color:var(--mut);margin:14px 10px 4px;text-transform:uppercase}
+  main{flex:1;padding:22px;min-width:0}
+  h2{margin:0 0 14px;font-size:20px}
+  .card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:16px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+  .stat{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px}
+  .stat b{display:block;font-size:20px} .stat span{color:var(--mut);font-size:13px}
+  .scroll{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;font-size:14px}
+  th,td{padding:7px 10px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:top;white-space:nowrap}
+  th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase}
+  td table{font-size:13px;margin:2px 0}
+  form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;align-items:end}
+  label{font-size:12px;color:var(--mut);display:block;margin-bottom:3px}
+  input,select{width:100%;padding:8px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit}
+  button.btn{background:var(--pri);color:var(--prit);border:0;border-radius:8px;padding:8px 14px;cursor:pointer;font:inherit}
+  button.sec{background:none;color:var(--tx);border:1px solid var(--bd)}
+  button.link{background:none;border:0;color:var(--pri);cursor:pointer;font:inherit;padding:0 6px}
+  .err{color:var(--err);margin:8px 0;min-height:1.2em} .mut{color:var(--mut)}
+  .qrow{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--bd);flex-wrap:wrap}
+  .qrow .t{flex:1;min-width:240px} .qrow input{width:150px}
+  .tag{font-size:11px;background:var(--bg);border:1px solid var(--bd);border-radius:20px;padding:1px 8px;color:var(--mut)}
+  @media(max-width:760px){body{flex-direction:column}nav{width:100%;height:auto;position:static;display:flex;flex-wrap:wrap;gap:4px}nav .sep{display:none}nav button{width:auto}}
+</style>
+</head>
+<body>
+<nav id="nav"></nav>
+<main id="main"></main>
+
+<script>
+// ====== Mô tả 9 thực thể: [tên thuộc tính JSON, nhãn, kiểu] — kiểu: date | number | enum:Ten | fk:route ======
+const ENUMS = {
+  KyThanhToan:['HANG_THANG','HANG_QUY','NUA_NAM','HANG_NAM'],
+  PhuongThuc:['TIEN_MAT','CHUYEN_KHOAN','THE','VI_DIEN_TU'],
+  TrangThaiYeuCau:['CHO_XU_LY','DANG_THAM_DINH','DA_DUYET','TU_CHOI'],
+  ChucVu:['TU_VAN_VIEN','TRUONG_NHOM','QUAN_LY']
+};
+const E = {
+  khachhang:{title:'Khách hàng', key:'maKhachHang', f:[['maKhachHang','Mã KH'],['hoTen','Họ tên'],['ngaySinh','Ngày sinh','date'],['soCanCuocCongDan','CCCD'],['ngheNghiep','Nghề nghiệp']]},
+  loaibaohiem:{title:'Loại bảo hiểm', key:'maLoaiBaoHiem', f:[['maLoaiBaoHiem','Mã loại'],['tenLoaiBaoHiem','Tên loại'],['soTienBaoHiem','Số tiền BH tối đa','number'],['soTienDongDinhKy','Số tiền đóng định kỳ','number'],['kyThanhToan','Kỳ thanh toán','enum:KyThanhToan']]},
+  nhanvien:{title:'Nhân viên', key:'maNhanVien', f:[['maNhanVien','Mã NV'],['hoTen','Họ tên'],['soDienThoai','Số điện thoại'],['email','Email'],['chucVu','Chức vụ','enum:ChucVu']]},
+  hopdong:{title:'Hợp đồng', key:'soHopDong', f:[['soHopDong','Số hợp đồng'],['ngayKyHopDong','Ngày ký','date'],['ngayHieuLuc','Ngày hiệu lực','date'],['ngayHetHan','Ngày hết hạn','date'],['triGia','Trị giá','number'],['maKhachHangDaiDien','KH đại diện','fk:khachhang'],['maNhanVien','Nhân viên','fk:nhanvien']]},
+  chitiethopdong:{title:'Chi tiết hợp đồng', key:'maChiTietHopDong', f:[['maChiTietHopDong','Mã chi tiết'],['soHopDong','Hợp đồng','fk:hopdong'],['maKhachHangThuHuong','KH thụ hưởng','fk:khachhang'],['maLoaiBaoHiem','Loại bảo hiểm','fk:loaibaohiem']]},
+  lichsudongtien:{title:'Lịch sử đóng tiền', key:'maGiaoDich', f:[['maGiaoDich','Mã giao dịch'],['ngayDongTien','Ngày đóng','date'],['soTienDong','Số tiền','number'],['phuongThuc','Phương thức','enum:PhuongThuc'],['maChiTietHopDong','Chi tiết HĐ','fk:chitiethopdong']]},
+  yeucaubaohiem:{title:'Yêu cầu bảo hiểm', key:'maYeuCau', f:[['maYeuCau','Mã yêu cầu'],['soTienYeuCau','Số tiền yêu cầu','number'],['soTienDuyetChi','Số tiền duyệt chi','number'],['ngayYeuCau','Ngày yêu cầu','date'],['trangThai','Trạng thái','enum:TrangThaiYeuCau'],['maChiTietHopDong','Chi tiết HĐ','fk:chitiethopdong']]},
+  quyenloi:{title:'Quyền lợi', key:'maQuyenLoi', f:[['maQuyenLoi','Mã quyền lợi'],['tenQuyenLoi','Tên quyền lợi'],['moTa','Mô tả'],['tyLeChiTra','Tỷ lệ chi trả (%)','number'],['maLoaiBaoHiem','Loại bảo hiểm','fk:loaibaohiem']]},
+  hoahong:{title:'Hoa hồng', key:'maHoaHong', f:[['maHoaHong','Mã hoa hồng'],['tyLeHoaHong','Tỷ lệ (%)','number'],['soTienHoaHong','Số tiền','number'],['ngayChiHoaHong','Ngày chi','date'],['soHopDong','Hợp đồng','fk:hopdong'],['maNhanVien','Nhân viên','fk:nhanvien']]}
+};
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt = v => typeof v === 'number' ? v.toLocaleString('vi-VN') : esc(v ?? '—');
+
+async function api(url, opt) {
+  const r = await fetch(url, opt);
+  const t = await r.text();
+  const data = t ? JSON.parse(t) : null;
+  if (!r.ok) throw new Error(data?.loi || ('Lỗi ' + r.status));
+  return data;
+}
+
+// ====== Điều hướng ======
+function buildNav() {
+  let h = '<h1>🛡️ Bảo hiểm Nhân thọ<br><span class="mut">Quản lý hợp đồng</span></h1>';
+  h += '<button data-v="home">📊 Tổng quan</button><div class="sep">Dữ liệu</div>';
+  for (const k in E) h += `<button data-v="${k}">${E[k].title}</button>`;
+  h += '<div class="sep">Truy vấn</div><button data-v="queries">🔎 20 câu truy vấn</button>';
+  $('#nav').innerHTML = h;
+  $('#nav').onclick = e => { const v = e.target.dataset.v; if (v) show(v); };
+}
+function show(v) {
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  if (v === 'home') return home();
+  if (v === 'queries') return queries();
+  return entity(v);
+}
+
+// ====== Tổng quan ======
+async function home() {
+  const d = await api('/api/tongquan');
+  const s = [['Khách hàng',d.soKhachHang],['Hợp đồng',d.soHopDong],['Tổng trị giá hợp đồng',d.tongTriGiaHopDong],['Tổng tiền đã thu',d.tongTienDaThu],['Tổng tiền đã chi trả',d.tongTienDaChi],['Tổng hoa hồng',d.tongHoaHong],['Yêu cầu đang xử lý',d.yeuCauChoXuLy]];
+  $('#main').innerHTML = '<h2>Tổng quan hoạt động</h2><div class="grid">' +
+    s.map(x => `<div class="stat"><b>${fmt(x[1])}</b><span>${x[0]}</span></div>`).join('') + '</div>';
+}
+
+// ====== CRUD một thực thể ======
+let editing = null;
+async function entity(route) {
+  const cfg = E[route];
+  const rows = await api('/api/' + route);
+  // nạp danh sách khóa ngoại cho các ô select
+  const fk = {};
+  for (const f of cfg.f) if ((f[2] || '').startsWith('fk:')) {
+    const r = f[2].slice(3);
+    fk[f[0]] = (await api('/api/' + r)).map(x => x[E[r].key]);
+  }
+  const input = f => {
+    const [n, l, t = ''] = f;
+    const dis = editing && n === cfg.key ? 'readonly' : '';
+    let el;
+    if (t.startsWith('enum:')) el = `<select name="${n}">${ENUMS[t.slice(5)].map(o => `<option>${o}</option>`).join('')}</select>`;
+    else if (t.startsWith('fk:')) el = `<select name="${n}">${fk[n].map(o => `<option>${esc(o)}</option>`).join('')}</select>`;
+    else el = `<input name="${n}" type="${t === 'date' ? 'date' : t === 'number' ? 'number' : 'text'}" step="any" required ${dis}>`;
+    return `<div><label>${l}</label>${el}</div>`;
+  };
+  $('#main').innerHTML = `<h2>${cfg.title}</h2>
+    <div class="card"><form id="f">${cfg.f.map(input).join('')}
+      <div><button class="btn" type="submit">${editing ? 'Lưu thay đổi' : 'Thêm mới'}</button>
+      ${editing ? '<button class="btn sec" type="button" id="huy">Hủy</button>' : ''}</div></form>
+      <div class="err" id="err"></div></div>
+    <div class="card scroll"><table><thead><tr>${cfg.f.map(f => `<th>${f[1]}</th>`).join('')}<th></th></tr></thead><tbody>
+    ${rows.map(r => `<tr>${cfg.f.map(f => `<td>${fmt(r[f[0]])}</td>`).join('')}
+      <td><button class="link" data-a="e" data-id="${esc(r[cfg.key])}">Sửa</button><button class="link" data-a="d" data-id="${esc(r[cfg.key])}">Xóa</button></td></tr>`).join('')}
+    </tbody></table></div>`;
+
+  if (editing) {
+    const cur = rows.find(r => r[cfg.key] === editing);
+    cfg.f.forEach(f => { const el = $(`[name=${f[0]}]`); if (cur && el) el.value = cur[f[0]]; });
+    $('#huy').onclick = () => { editing = null; entity(route); };
+  }
+  $('#f').onsubmit = async ev => {
+    ev.preventDefault();
+    const body = {};
+    cfg.f.forEach(f => { const v = $(`[name=${f[0]}]`).value; body[f[0]] = f[2] === 'number' ? Number(v) : v; });
+    try {
+      if (editing) await api(`/api/${route}/${encodeURIComponent(editing)}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+      else await api('/api/' + route, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+      editing = null; entity(route);
+    } catch (e) { $('#err').textContent = e.message; }
+  };
+  $('tbody').onclick = async ev => {
+    const b = ev.target.closest('button'); if (!b) return;
+    const id = b.dataset.id;
+    if (b.dataset.a === 'e') { editing = id; entity(route); }
+    else if (confirm('Xóa ' + id + '?')) {
+      try { await api(`/api/${route}/${encodeURIComponent(id)}`, {method:'DELETE'}); entity(route); }
+      catch (e) { $('#err').textContent = e.message; }
+    }
+  };
+}
+
+// ====== Hiển thị kết quả truy vấn (đệ quy: mảng -> bảng, object -> bảng khóa/giá trị) ======
+function render(v) {
+  if (v === null || v === undefined) return '<span class="mut">— (không có kết quả)</span>';
+  if (Array.isArray(v)) {
+    if (!v.length) return '<span class="mut">— (rỗng)</span>';
+    if (typeof v[0] !== 'object') return v.map(fmt).join(', ');
+    const cols = Object.keys(v[0]);
+    return `<table><thead><tr>${cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>` +
+      v.map(r => `<tr>${cols.map(c => `<td>${render(r[c])}</td>`).join('')}</tr>`).join('') + '</tbody></table>';
+  }
+  if (typeof v === 'object')
+    return '<table><tbody>' + Object.entries(v).map(([k, x]) => `<tr><th>${esc(k)}</th><td>${render(x)}</td></tr>`).join('') + '</tbody></table>';
+  return fmt(v);
+}
+
+async function queries() {
+  const qs = await api('/api/queries');
+  $('#main').innerHTML = '<h2>20 câu truy vấn (LINQ)</h2><div class="card">' +
+    qs.map(q => `<div class="qrow"><div class="t"><span class="tag">Q${q.id} · TV${q.thanhVien}</span> ${esc(q.moTa)}</div>
+      ${q.thamSo ? `<input id="p${q.id}" value="${esc(q.macDinh)}" title="${esc(q.thamSo)}" placeholder="${esc(q.thamSo)}">` : ''}
+      <button class="btn" data-q="${q.id}">Chạy</button></div>`).join('') +
+    '</div><div class="card scroll" id="kq"><span class="mut">Chọn "Chạy" để xem kết quả.</span></div>';
+  $('.card').onclick = async ev => {
+    const id = ev.target.dataset.q; if (!id) return;
+    const p = $('#p' + id)?.value ?? '';
+    try {
+      const d = await api(`/api/queries/${id}?p=${encodeURIComponent(p)}`);
+      $('#kq').innerHTML = `<b>Kết quả Query ${id}</b><br><br>` + render(d);
+    } catch (e) { $('#kq').textContent = e.message; }
+  };
+}
+
+buildNav();
+show('home');
+</script>
+</body>
+</html>
